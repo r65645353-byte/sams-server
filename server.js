@@ -1,100 +1,75 @@
-// ============================================
-//  SEVA 24 – FULL SMS SERVER (FAST2SMS)
-//  WITH ERROR & SUCCESS LOGS FOR RENDER
-// ============================================
-
+// ==========================================
+//  SEVA24 – TWILIO SMS SERVER (100% Working)
+// ==========================================
 import express from "express";
 import cors from "cors";
-import axios from "axios";
+import twilio from "twilio";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 const app = express();
-
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// ============================================
-//  ROOT CHECK ROUTE
-// ============================================
+// Twilio Config
+const client = twilio(
+    process.env.ACCOUNT_SID,
+    process.env.AUTH_TOKEN
+);
+
+// Root test
 app.get("/", (req, res) => {
-    res.send("✅ Seva24 SMS Server Running Successfully");
+    res.send("✅ Seva24 Twilio SMS Server Running Successfully");
 });
 
-// ============================================
-//  SEND SMS API
-// ============================================
+// SEND SMS API
 app.post("/send-sms", async (req, res) => {
     try {
         const { mobile, message } = req.body;
 
-        // Log request (Render will show this)
         console.log("📩 Incoming SMS Request:", req.body);
 
         if (!mobile || !message) {
-            console.log("❌ Missing fields");
             return res.json({
                 success: false,
-                message: "Mobile & Message required",
+                message: "Mobile number and message required"
             });
         }
 
-        // Remove +91 if present
-        const cleanNumber = mobile.replace("+91", "");
-
-        // Fast2SMS API Key
-        const apiKey = process.env.FAST2SMS_API_KEY;
-
-        if (!apiKey) {
-            console.log("❌ FAST2SMS_API_KEY missing in environment");
-            return res.json({ success: false, message: "API Key missing" });
+        // Convert to +91 format
+        let phone = mobile.toString();
+        if (!phone.startsWith("+91")) {
+            phone = "+91" + phone;
         }
 
-        // ==== Call Fast2SMS API ====
-        const response = await axios.post(
-            "https://www.fast2sms.com/dev/bulkV2",
-            {
-                route: "v3",
-                sender_id: "TXTIND", // ⚠ Replace with your approved DLT sender ID
-                message: message,
-                language: "english",
-                numbers: cleanNumber,
-            },
-            {
-                headers: {
-                    authorization: apiKey,
-                },
-            }
-        );
+        // Send SMS via Twilio
+        const response = await client.messages.create({
+            body: message,
+            to: phone,
+            from: process.env.TWILIO_PHONE
+        });
 
-        // Success Log (visible in Render)
-        console.log("✅ SMS Sent Successfully:", response.data);
+        console.log("✅ Twilio SMS Sent:", response.sid);
 
         return res.json({
             success: true,
-            message: "SMS Sent Successfully",
-            data: response.data,
+            sid: response.sid,
+            message: "SMS sent successfully"
         });
 
     } catch (err) {
-        // Error Log (visible in Render)
-        console.log("❌ SMS Sending Error:", err.message);
+        console.log("❌ Twilio SMS Error:", err.message);
 
         return res.json({
             success: false,
-            message: "Error sending SMS",
-            error: err.message,
+            error: err.message
         });
     }
 });
 
-// ============================================
-//  START SERVER
-// ============================================
+// Start Server
 const PORT = process.env.PORT || 10000;
-
 app.listen(PORT, () => {
-    console.log(`🚀 Seva24 SMS Server Live on Port ${PORT}`);
+    console.log(`🚀 Twilio SMS Server Running on port ${PORT}`);
 });
